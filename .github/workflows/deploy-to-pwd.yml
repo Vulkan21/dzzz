@@ -1,0 +1,61 @@
+name: Deploy static site to Play-with-Docker
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Archive dist folder
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "Папка dist не найдена. Сначала соберите сайт (npm run build)."
+            exit 1
+          fi
+          tar -C dist -czf site.tar.gz .
+          ls -lh site.tar.gz
+
+      - name: Copy site to PWD
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.PWD_HOST }}
+          username: ${{ secrets.PWD_USER }}
+          key: ${{ secrets.PWD_SSH_KEY }}
+          port: ${{ secrets.PWD_SSH_PORT || 22 }}
+          source: "site.tar.gz"
+          target: "~/app/site.tar.gz"
+          overwrite: true
+
+      - name: Run docker compose on PWD
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.PWD_HOST }}
+          username: ${{ secrets.PWD_USER }}
+          key: ${{ secrets.PWD_SSH_KEY }}
+          port: ${{ secrets.PWD_SSH_PORT || 22 }}
+          script: |
+            set -e
+            mkdir -p ~/app/site
+            tar -C ~/app/site -xzf ~/app/site.tar.gz
+
+            cat > ~/app/docker-compose.yml <<'YAML'
+            version: "3.8"
+            services:
+              web:
+                image: nginx:alpine
+                ports:
+                  - "80:80"
+                volumes:
+                  - ./site:/usr/share/nginx/html:ro
+                restart: unless-stopped
+            YAML
+
+            cd ~/app
+            docker compose up -d
+            docker ps
+            echo "Сайт задеплоен! В PWD нажмите «Open Port 80»."
