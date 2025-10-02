@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой статический сайт</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Добро пожаловать на мой сайт!</h1>
+            <nav>
+                <ul>
+                    <li><a href="#home">Главная</a></li>
+                    <li><a href="#about">О нас</a></li>
+                    <li><a href="#contact">Контакты</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <main>
+            <section id="home">
+                <h2>Главная страница</h2>
+                <p>Это простой статический сайт, развернутый с помощью Docker и GitHub Actions.</p>
+                <button id="clickBtn">Нажми меня!</button>
+                <p id="message" style="display: none;">Привет из JavaScript! 🎉</p>
+            </section>
+
+            <section id="about">
+                <h2>О проекте</h2>
+                <p>Этот сайт демонстрирует:</p>
+                <ul>
+                    <li>Статический HTML/CSS/JS</li>
+                    <li>Контейнеризацию с Docker</li>
+                    <li>CI/CD с GitHub Actions</li>
+                    <li>Развертывание на play-with-docker</li>
+                </ul>
+            </section>
+
+            <section id="contact">
+                <h2>Контакты</h2>
+                <p>Время сервера: <span id="serverTime"></span></p>
+                <p>Статус: <span class="status">Онлайн</span></p>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 Статический сайт. Развернуто с помощью Docker.</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

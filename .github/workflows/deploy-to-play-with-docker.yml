@@ -1,0 +1,221 @@
+name: Deploy Static Site to Play-with-Docker
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      play_with_docker_url:
+        description: 'Play-with-Docker instance URL'
+        required: true
+        default: 'https://labs.play-with-docker.com'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Docker image
+      run: |
+        docker build -t static-website:latest .
+        
+    - name: Test Docker container locally
+      run: |
+        docker run -d --name test-container -p 8080:80 static-website:latest
+        sleep 10
+        curl -f http://localhost:8080 || exit 1
+        docker stop test-container
+        docker rm test-container
+        
+    - name: Save Docker image as tar
+      run: |
+        docker save static-website:latest > static-website.tar
+        
+    - name: Create deployment package
+      run: |
+        mkdir -p deployment-package
+        cp docker-compose.yml deployment-package/
+        cp static-website.tar deployment-package/
+        
+        # Создаем скрипт для загрузки образа
+        cat > deployment-package/deploy.sh << 'EOF'
+        #!/bin/bash
+        echo "🚀 Загружаем Docker образ..."
+        docker load < static-website.tar
+        
+        echo "📦 Запускаем контейнер с помощью docker-compose..."
+        docker-compose up -d
+        
+        echo "✅ Развертывание завершено!"
+        echo "🌐 Сайт доступен по адресу: http://localhost"
+        
+        # Показываем статус контейнера
+        echo "📊 Статус контейнера:"
+        docker-compose ps
+        
+        # Показываем логи
+        echo "📋 Последние логи:"
+        docker-compose logs --tail=20
+        EOF
+        
+        chmod +x deployment-package/deploy.sh
+        
+        # Создаем README для развертывания
+        cat > deployment-package/README.md << 'EOF'
+        # Развертывание статического сайта на Play-with-Docker
+        
+        ## Быстрый старт
+        
+        1. Скопируйте все файлы из этой папки на ваш Play-with-Docker инстанс
+        2. Выполните команду: `./deploy.sh`
+        
+        ## Альтернативный способ
+        
+        ```bash
+        # Загрузить образ
+        docker load < static-website.tar
+        
+        # Запустить контейнер
+        docker-compose up -d
+        ```
+        
+        ## Проверка работы
+        
+        ```bash
+        # Проверить статус
+        docker-compose ps
+        
+        # Посмотреть логи
+        docker-compose logs
+        
+        # Остановить
+        docker-compose down
+        ```
+        
+        Сайт будет доступен по адресу: http://localhost
+        EOF
+        
+    - name: Create archive for Play-with-Docker
+      run: |
+        cd deployment-package
+        tar -czf ../play-with-docker-deployment.tar.gz .
+        cd ..
+        
+    - name: Upload deployment artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: play-with-docker-deployment
+        path: |
+          play-with-docker-deployment.tar.gz
+          deployment-package/
+        retention-days: 30
+        
+    - name: Generate deployment instructions
+      run: |
+        cat > DEPLOYMENT_INSTRUCTIONS.md << 'EOF'
+        # 🚀 Инструкции по развертыванию на Play-with-Docker
+        
+        ## Шаг 1: Скачайте артефакты
+        
+        1. Перейдите во вкладку "Actions" в вашем GitHub репозитории
+        2. Найдите последний успешный workflow run
+        3. Скачайте артефакт `play-with-docker-deployment`
+        
+        ## Шаг 2: Подготовьте Play-with-Docker
+        
+        1. Откройте https://labs.play-with-docker.com
+        2. Войдите в систему (требуется Docker Hub аккаунт)
+        3. Нажмите "Start" для создания новой сессии
+        4. Нажмите "+ ADD NEW INSTANCE" для создания нового узла
+        
+        ## Шаг 3: Загрузите файлы
+        
+        В терминале Play-with-Docker выполните:
+        
+        ```bash
+        # Создайте директорию для проекта
+        mkdir static-website && cd static-website
+        
+        # Загрузите архив (замените URL на ваш)
+        wget https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/latest/play-with-docker-deployment.tar.gz
+        
+        # Или используйте curl
+        curl -L -o play-with-docker-deployment.tar.gz "DIRECT_DOWNLOAD_LINK"
+        
+        # Распакуйте архив
+        tar -xzf play-with-docker-deployment.tar.gz
+        ```
+        
+        ## Шаг 4: Запустите сайт
+        
+        ```bash
+        # Выполните скрипт развертывания
+        ./deploy.sh
+        
+        # Или вручную:
+        docker load < static-website.tar
+        docker-compose up -d
+        ```
+        
+        ## Шаг 5: Откройте сайт
+        
+        1. После запуска контейнера, в Play-with-Docker появится кнопка с портом "80"
+        2. Нажмите на неё для открытия сайта в новой вкладке
+        3. Или используйте прямую ссылку, которая появится в интерфейсе
+        
+        ## Полезные команды
+        
+        ```bash
+        # Проверить статус контейнера
+        docker-compose ps
+        
+        # Посмотреть логи
+        docker-compose logs
+        
+        # Перезапустить
+        docker-compose restart
+        
+        # Остановить
+        docker-compose down
+        
+        # Посмотреть использование ресурсов
+        docker stats
+        ```
+        
+        ## Устранение проблем
+        
+        - Если порт 80 занят, измените порт в docker-compose.yml (например, на 8080:80)
+        - Убедитесь, что Docker образ загружен: `docker images`
+        - Проверьте логи контейнера: `docker-compose logs`
+        
+        EOF
+        
+    - name: Upload deployment instructions
+      uses: actions/upload-artifact@v4
+      with:
+        name: deployment-instructions
+        path: DEPLOYMENT_INSTRUCTIONS.md
+        retention-days: 30
+        
+    - name: Display success message
+      run: |
+        echo "✅ Сборка и подготовка к развертыванию завершена успешно!"
+        echo ""
+        echo "📦 Созданные артефакты:"
+        echo "  - play-with-docker-deployment.tar.gz (архив для развертывания)"
+        echo "  - DEPLOYMENT_INSTRUCTIONS.md (инструкции по развертыванию)"
+        echo ""
+        echo "🚀 Следующие шаги:"
+        echo "  1. Скачайте артефакты из раздела Actions"
+        echo "  2. Загрузите их на Play-with-Docker"
+        echo "  3. Выполните ./deploy.sh"
+        echo ""
+        echo "🌐 После развертывания сайт будет доступен по порту 80"

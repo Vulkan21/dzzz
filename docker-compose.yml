@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "80:80"
+    container_name: static-website
+    restart: unless-stopped
+    
+    # Переменные окружения
+    environment:
+      - NGINX_HOST=localhost
+      - NGINX_PORT=80
+    
+    # Метки для удобства
+    labels:
+      - "description=Static website deployed via GitHub Actions"
+      - "version=1.0"
+      - "maintainer=github-actions"
+    
+    # Проверка здоровья контейнера
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  default:
+    name: static-website-network
